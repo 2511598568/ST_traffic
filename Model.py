@@ -1,3 +1,4 @@
+
 import torch
 from torch import nn, einsum
 from einops import rearrange
@@ -19,18 +20,18 @@ class PreNorm(nn.Module):
 class FeedForward(nn.Module):
     """Multilayer perceptron with GELU activation"""
 
-    def __init__(self, embed_dim, expansion=4, p_drop=0.):
+    def __init__(self, dim, hidden_dim, dropout=0.):
         super().__init__()
-        self.blocks = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim * expansion),
+        self.net = nn.Sequential(
+            nn.Linear(dim, hidden_dim),
             nn.GELU(),
-            nn.Dropout(p_drop),
-            nn.Linear(embed_dim * expansion, embed_dim),
-            nn.Dropout(p_drop)
+            nn.Dropout(dropout),
+            nn.Linear(hidden_dim, dim),
+            nn.Dropout(dropout)
         )
 
-    def forward(self, input_tensor):
-        return self.blocks(input_tensor)
+    def forward(self, x):
+        return self.net(x)
 
 
 class MultiHeadAttention(nn.Module):
@@ -67,22 +68,20 @@ class MultiHeadAttention(nn.Module):
 class AttentionStack(nn.Module):
     """Stack of transformer layers"""
 
-    def __init__(self, embed_dim, num_layers, num_heads, head_dim, mlp_dim, p_drop=0.):
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
         super().__init__()
-        self.transformer_layers = nn.ModuleList()
-        for _ in range(num_layers):
-            self.transformer_layers.append(nn.ModuleList([
-                PreNorm(embed_dim, MultiHeadAttention(
-                    embed_dim, num_heads, head_dim, p_drop)),
-                PreNorm(embed_dim, FeedForward(embed_dim, mlp_dim // embed_dim, p_drop))
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm(dim, MultiHeadAttention(dim, num_heads=heads, head_dim=dim_head, p_drop=dropout)),
+                PreNorm(dim, FeedForward(dim, mlp_dim))
             ]))
 
-    def forward(self, input_tensor):
-        for attention_block, mlp_block in self.transformer_layers:
-            input_tensor = attention_block(input_tensor) + input_tensor
-            input_tensor = mlp_block(input_tensor) + input_tensor
-        return input_tensor
-
+    def forward(self, x):
+        for attn, ff in self.layers:
+            x = attn(x) + x
+            x = ff(x) + x
+        return x
 
 class DSConv(nn.Module):
     """Depthwise separable convolution"""
