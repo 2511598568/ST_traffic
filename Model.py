@@ -173,7 +173,7 @@ class OutputProjection(nn.Module):
         return self.final_conv(feature_map)
 
 
-class TransUNet_Tr(nn.Module):
+class TrafficUNet(nn.Module):
     """Hybrid CNN-Transformer architecture for segmentation"""
 
     def __init__(self, in_ch, out_ch, depth_mult=2, bilinear=True, hidden = 512):
